@@ -31,20 +31,36 @@ export enum SortOption {
 export class VideoService {
   // Método para normalizar os objetos de vídeo
   private static normalizeVideo(video: any): Video {
-    // Garantir consistência nos campos
+    // Converter duration (inteiro em segundos) para formato string (MM:SS ou HH:MM:SS)
+    let formattedDuration = '00:00';
+    if (typeof video.duration === 'number') {
+      const totalSeconds = video.duration;
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      
+      if (minutes < 60) {
+        formattedDuration = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      } else {
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = minutes % 60;
+        formattedDuration = `${hours.toString().padStart(2, '0')}:${remainingMinutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }
+    }
+    
+    // Garantir consistência nos campos - mapeando do esquema do banco para o formato esperado pelo frontend
     return {
       $id: video.$id,
       title: video.title || 'Untitled',
       description: video.description || '',
       price: typeof video.price === 'number' ? video.price : parseFloat(video.price || '0'),
-      duration: video.duration || '00:00',
-      videoFileId: video.videoFileId || video.video_id || null,
-      video_id: video.video_id || video.videoFileId || null,
-      thumbnailFileId: video.thumbnailFileId || video.thumbnail_id || null,
-      thumbnail_id: video.thumbnail_id || video.thumbnailFileId || null,
+      duration: video.duration ? formattedDuration : '00:00', // Converter de inteiro para string formatada
+      videoFileId: video.video_id || null, // Mapear video_id para videoFileId no frontend
+      video_id: video.video_id || null, // Manter video_id para compatibilidade interna
+      thumbnailFileId: video.thumbnail_id || null, // Mapear thumbnail_id para thumbnailFileId no frontend
+      thumbnail_id: video.thumbnail_id || null, // Manter thumbnail_id para compatibilidade interna
       thumbnailUrl: video.thumbnailUrl || null,
       isPurchased: video.isPurchased || false,
-      createdAt: video.createdAt || video.created_at || new Date().toISOString(),
+      createdAt: video.created_at || new Date().toISOString(), // Mapear created_at para createdAt no frontend
       views: typeof video.views === 'number' ? video.views : 0,
       product_link: video.product_link || ''
     };
