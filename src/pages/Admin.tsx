@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../services/Auth';
-import { VideoService } from '../../services/VideoService';
+import { useAuth } from '../services/Auth';
+import { VideoService } from '../services/VideoService';
 import { ID } from 'appwrite';
-import { useSiteConfig } from '../../context/SiteConfigContext';
-import { databases, databaseId, storage, videoCollectionId, siteConfigCollectionId, userCollectionId, videosBucketId, thumbnailsBucketId } from '../../services/node_appwrite';
+import { useSiteConfig } from '../context/SiteConfigContext';
+import { databases, databaseId, storage, videoCollectionId, siteConfigCollectionId, userCollectionId, videosBucketId, thumbnailsBucketId } from '../services/node_appwrite';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Switch from '@mui/material/Switch';
 import SendIcon from '@mui/icons-material/Send';
