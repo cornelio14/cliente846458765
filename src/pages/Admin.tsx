@@ -980,7 +980,8 @@ const Admin: FC = () => {
       
       await AppwriteSchemaManager.initializeSchema();
       
-      showFeedback('Schema initialized successfully. All required attributes have been created.', 'success');
+      showFeedback('Schema documentation generated. Please check the console for required attributes.', 'success');
+      setError('Note: Due to SDK compatibility issues, attributes must be created manually in the Appwrite Console. See browser console for details.');
       
       // Refresh data
       await Promise.all([
@@ -989,9 +990,9 @@ const Admin: FC = () => {
         fetchSiteConfig()
       ]);
     } catch (err) {
-      console.error('Error initializing schema:', err);
-      setError('Failed to initialize schema. Please check the console for details.');
-      showFeedback('Failed to initialize schema', 'error');
+      console.error('Error generating schema documentation:', err);
+      setError('Failed to generate schema documentation. Please check the console for details.');
+      showFeedback('Failed to generate schema documentation', 'error');
     } finally {
       setInitializingSchema(false);
     }
@@ -1242,617 +1243,437 @@ const Admin: FC = () => {
         
         {/* Site Configuration & Users Tab */}
         <TabPanel value={tabValue} index={1}>
-          <Grid container spacing={4}>
-            {/* Site Configuration Section */}
-            <Grid item xs={12} lg={6}>
-              <Card elevation={2} sx={{ height: '100%' }}>
-                <CardContent>
-                  <Box sx={{ mb: 3 }}>
-                    <Grid container spacing={2} alignItems="center" justifyContent="space-between">
-                      <Grid item>
-                        <Typography variant="h5" component="h2" gutterBottom>
-                          Site Configuration
-                        </Typography>
+          <Box sx={{ mb: 4 }}>
+            <Grid container spacing={2} alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+              <Grid item>
+                <Typography variant="h5" component="h2">
+                  Site Configuration
+                </Typography>
+              </Grid>
+              <Grid item>
+                <Box sx={{ display: 'flex', gap: 2 }}>
+                  {/* Botão para inicializar o schema do banco de dados */}
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    onClick={handleInitializeSchema}
+                    disabled={initializingSchema}
+                    startIcon={initializingSchema ? <CircularProgress size={20} color="inherit" /> : <SettingsIcon />}
+                  >
+                    {initializingSchema ? 'Initializing...' : 'Initialize Schema'}
+                  </Button>
+                  
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => setEditingConfig(!editingConfig)}
+                    startIcon={editingConfig ? <CancelIcon /> : <EditIcon />}
+                  >
+                    {editingConfig ? 'Cancel Edit' : 'Edit Config'}
+                  </Button>
+                </Box>
+              </Grid>
+            </Grid>
+
+            {error && (
+              <Alert severity="error" sx={{ mb: 2, mt: 2 }}>
+                {error}
+              </Alert>
+            )}
+
+            <Paper elevation={2} sx={{ p: 3, mb: 4 }}>
+              {editingConfig ? (
+                <Box component="form">
+                  <TextField
+                    fullWidth
+                    margin="normal"
+                    label="Site Name"
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    required
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    margin="normal"
+                    label="Video List Title"
+                    value={videoListTitle}
+                    onChange={(e) => setVideoListTitle(e.target.value)}
+                    helperText="Title shown on the video listing page"
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    margin="normal"
+                    label="PayPal Client ID"
+                    value={paypalClientId}
+                    onChange={(e) => setPaypalClientId(e.target.value)}
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    label="Stripe Publishable Key"
+                    value={stripePublishableKey}
+                    onChange={(e) => setStripePublishableKey(e.target.value)}
+                    margin="normal"
+                    disabled={!editingConfig}
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    label="Stripe Secret Key"
+                    value={stripeSecretKey}
+                    onChange={(e) => setStripeSecretKey(e.target.value)}
+                    margin="normal"
+                    disabled={!editingConfig}
+                    type="password"
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    margin="normal"
+                    label="Telegram Username (without @)"
+                    value={telegramUsername}
+                    onChange={(e) => setTelegramUsername(e.target.value)}
+                  />
+                  
+                  <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
+                    Configurações de Email (PayPal)
+                  </Typography>
+
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    Configure os campos abaixo para permitir o envio de emails de confirmação aos compradores do PayPal.
+                  </Alert>
+                  
+                  <TextField
+                    fullWidth
+                    margin="normal"
+                    label="Host SMTP"
+                    value={emailHost}
+                    onChange={(e) => setEmailHost(e.target.value)}
+                    helperText="Ex: smtp.gmail.com"
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    margin="normal"
+                    label="Porta SMTP"
+                    value={emailPort}
+                    onChange={(e) => setEmailPort(e.target.value)}
+                    helperText="Ex: 587"
+                  />
+                  
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={emailSecure}
+                        onChange={(e) => setEmailSecure(e.target.checked)}
+                      />
+                    }
+                    label="Conexão Segura (SSL/TLS)"
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    margin="normal"
+                    label="Usuário de Email"
+                    value={emailUser}
+                    onChange={(e) => setEmailUser(e.target.value)}
+                    helperText="Email de login (ex: seu@gmail.com)"
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    margin="normal"
+                    type="password"
+                    label="Senha de Email/App Password"
+                    value={emailPass}
+                    onChange={(e) => setEmailPass(e.target.value)}
+                    helperText="Senha de App para Gmail ou senha normal para outros provedores"
+                  />
+                  
+                  <TextField
+                    fullWidth
+                    margin="normal"
+                    label="Email de Origem (opcional)"
+                    value={emailFrom}
+                    onChange={(e) => setEmailFrom(e.target.value)}
+                    helperText="Nome <email@exemplo.com> (opcional, usa o email de login por padrão)"
+                  />
+
+                  {/* Teste de configuração de email */}
+                  <Box sx={{ mt: 3, mb: 2 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Testar configurações de email
+                    </Typography>
+                    
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid item xs={12} sm={8}>
+                        <TextField
+                          fullWidth
+                          label="Email para teste"
+                          value={testEmailAddress}
+                          onChange={(e) => setTestEmailAddress(e.target.value)}
+                          placeholder="Digite um email para receber o teste"
+                          helperText="O email de teste será enviado para este endereço"
+                        />
                       </Grid>
-                      {!editingConfig && (
-                        <Grid item container spacing={1} xs="auto" alignItems="center">
-                          <Grid item>
-                            <Tooltip title="Initialize the schema to create all required attributes">
-                              <Button
-                                variant="contained"
-                                color="secondary"
-                                onClick={handleInitializeSchema}
-                                disabled={initializingSchema}
-                                size="small"
-                                startIcon={initializingSchema ? <CircularProgress size={20} color="inherit" /> : null}
-                              >
-                                {initializingSchema ? 'Initializing...' : 'Initialize Schema'}
-                              </Button>
-                            </Tooltip>
-                          </Grid>
-                          <Grid item>
-                            <Button
-                              variant="contained"
-                              color="primary"
-                              onClick={() => setEditingConfig(true)}
-                              startIcon={<EditIcon />}
-                              size="small"
-                            >
-                              Edit
-                            </Button>
-                          </Grid>
-                        </Grid>
-                      )}
+                      <Grid item xs={12} sm={4}>
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          color="secondary"
+                          onClick={handleTestEmailConfig}
+                          disabled={!testEmailAddress || testingEmail}
+                          startIcon={testingEmail ? <CircularProgress size={20} /> : <SendIcon />}
+                        >
+                          {testingEmail ? 'Enviando...' : 'Enviar teste'}
+                        </Button>
+                      </Grid>
                     </Grid>
                     
-                    <Alert severity="info" sx={{ mt: 2 }} variant="outlined">
-                      If you're experiencing issues with missing attributes in Appwrite, click the <strong>Initialize Schema</strong> button. 
-                      This will automatically create all required attributes in the database collections.
-                    </Alert>
+                    {testEmailResult && (
+                      <Alert 
+                        severity={testEmailResult.success ? 'success' : 'error'} 
+                        sx={{ mt: 2 }}
+                        onClose={() => setTestEmailResult(null)}
+                      >
+                        {testEmailResult.message}
+                      </Alert>
+                    )}
                   </Box>
                   
-                  {error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                      {error}
-                    </Alert>
-                  )}
-                  
-                  {loading && !editingConfig ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-                      <CircularProgress />
-                    </Box>
-                  ) : (
-                    <Box>
-                      {editingConfig ? (
-                        <Box component="form">
-                          <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Site Name"
-                            value={siteName}
-                            onChange={(e) => setSiteName(e.target.value)}
-                            required
-                          />
-                          
-                          <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Video List Title"
-                            value={videoListTitle}
-                            onChange={(e) => setVideoListTitle(e.target.value)}
-                            helperText="Title shown on the video listing page"
-                          />
-                          
-                          <TextField
-                            fullWidth
-                            margin="normal"
-                            label="PayPal Client ID"
-                            value={paypalClientId}
-                            onChange={(e) => setPaypalClientId(e.target.value)}
-                          />
-                          
-                          <TextField
-                            fullWidth
-                            label="Stripe Publishable Key"
-                            value={stripePublishableKey}
-                            onChange={(e) => setStripePublishableKey(e.target.value)}
-                            margin="normal"
-                            disabled={!editingConfig}
-                          />
-                          
-                          <TextField
-                            fullWidth
-                            label="Stripe Secret Key"
-                            value={stripeSecretKey}
-                            onChange={(e) => setStripeSecretKey(e.target.value)}
-                            margin="normal"
-                            disabled={!editingConfig}
-                            type="password"
-                          />
-                          
-                          <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Telegram Username (without @)"
-                            value={telegramUsername}
-                            onChange={(e) => setTelegramUsername(e.target.value)}
-                          />
-                          
-                          <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
-                            Configurações de Email (PayPal)
-                          </Typography>
-
-                          <Alert severity="info" sx={{ mb: 2 }}>
-                            Configure os campos abaixo para permitir o envio de emails de confirmação aos compradores do PayPal.
-                          </Alert>
-                          
-                          <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Host SMTP"
-                            value={emailHost}
-                            onChange={(e) => setEmailHost(e.target.value)}
-                            helperText="Ex: smtp.gmail.com"
-                          />
-                          
-                          <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Porta SMTP"
-                            value={emailPort}
-                            onChange={(e) => setEmailPort(e.target.value)}
-                            helperText="Ex: 587"
-                          />
-                          
-                          <FormControlLabel
-                            control={
-                              <Switch
-                                checked={emailSecure}
-                                onChange={(e) => setEmailSecure(e.target.checked)}
-                              />
-                            }
-                            label="Conexão Segura (SSL/TLS)"
-                          />
-                          
-                          <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Usuário de Email"
-                            value={emailUser}
-                            onChange={(e) => setEmailUser(e.target.value)}
-                            helperText="Email de login (ex: seu@gmail.com)"
-                          />
-                          
-                          <TextField
-                            fullWidth
-                            margin="normal"
-                            type="password"
-                            label="Senha de Email/App Password"
-                            value={emailPass}
-                            onChange={(e) => setEmailPass(e.target.value)}
-                            helperText="Senha de App para Gmail ou senha normal para outros provedores"
-                          />
-                          
-                          <TextField
-                            fullWidth
-                            margin="normal"
-                            label="Email de Origem (opcional)"
-                            value={emailFrom}
-                            onChange={(e) => setEmailFrom(e.target.value)}
-                            helperText="Nome <email@exemplo.com> (opcional, usa o email de login por padrão)"
-                          />
-
-                          {/* Teste de configuração de email */}
-                          <Box sx={{ mt: 3, mb: 2 }}>
-                            <Typography variant="subtitle1" gutterBottom>
-                              Testar configurações de email
-                            </Typography>
-                            
-                            <Grid container spacing={2} alignItems="center">
-                              <Grid item xs={12} sm={8}>
-                                <TextField
-                                  fullWidth
-                                  label="Email para teste"
-                                  value={testEmailAddress}
-                                  onChange={(e) => setTestEmailAddress(e.target.value)}
-                                  placeholder="Digite um email para receber o teste"
-                                  helperText="O email de teste será enviado para este endereço"
-                                />
-                              </Grid>
-                              <Grid item xs={12} sm={4}>
-                                <Button
-                                  fullWidth
-                                  variant="contained"
-                                  color="secondary"
-                                  onClick={handleTestEmailConfig}
-                                  disabled={!testEmailAddress || testingEmail}
-                                  startIcon={testingEmail ? <CircularProgress size={20} /> : <SendIcon />}
-                                >
-                                  {testingEmail ? 'Enviando...' : 'Enviar teste'}
-                                </Button>
-                              </Grid>
-                            </Grid>
-                            
-                            {testEmailResult && (
-                              <Alert 
-                                severity={testEmailResult.success ? 'success' : 'error'} 
-                                sx={{ mt: 2 }}
-                                onClose={() => setTestEmailResult(null)}
-                              >
-                                {testEmailResult.message}
-                              </Alert>
-                            )}
-                          </Box>
-                          
-                          <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
-                            Crypto Wallets
-                          </Typography>
-                          <Box sx={{ mb: 2 }}>
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                              Add up to 5 cryptocurrency wallets for payment
-                            </Typography>
-                            <Alert severity="info" sx={{ mt: 1, mb: 1 }} variant="outlined">
-                              <Typography variant="caption">
-                                Note: If you're seeing errors about the "crypto" attribute, please make sure it's correctly 
-                                configured in your Appwrite database. Your wallets will be saved locally in the meantime.
-                              </Typography>
-                            </Alert>
-                          </Box>
-                          
-                          <Box sx={{ mb: 2 }}>
-                            {cryptoWallets.map((wallet, index) => {
-                              const [header, address] = wallet.split('\n');
-                              return (
-                                <Paper key={index} variant="outlined" sx={{ p: 1, mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <Box>
-                                    <Typography variant="subtitle2">{header}</Typography>
-                                    <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{address}</Typography>
-                                  </Box>
-                                  <IconButton 
-                                    color="error" 
-                                    onClick={() => {
-                                      // Se as carteiras estão vindo do banco de dados, precisamos atualizar o estado local primeiro
-                                      if (walletsFromDb.length > 0) {
-                                        const updatedWallets = [...walletsFromDb];
-                                        updatedWallets.splice(index, 1);
-                                        setCryptoWallets(updatedWallets);
-                                        
-                                        // Salvar imediatamente no banco de dados
-                                        handleSaveSiteConfig();
-                                      } else {
-                                        // Se são carteiras locais, apenas remover do estado
-                                        handleRemoveCryptoWallet(index);
-                                      }
-                                    }}
-                                    size="small"
-                                    aria-label="remove wallet"
-                                  >
-                                    <DeleteIcon fontSize="small" />
-                                  </IconButton>
-                                </Paper>
-                              );
-                            })}
-                            
-                            {cryptoWallets.length === 0 && (
-                              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                No crypto wallets added yet
-                              </Typography>
-                            )}
-                          </Box>
-                          
-                          {cryptoWallets.length < 5 && (
-                            <Grid container spacing={2} alignItems="center">
-                              <Grid item xs={12} sm={4}>
-                                <FormControl fullWidth>
-                                  <InputLabel id="crypto-select-label">Cryptocurrency</InputLabel>
-                                  <Select
-                                    labelId="crypto-select-label"
-                                    value={selectedCrypto}
-                                    label="Cryptocurrency"
-                                    onChange={(e) => setSelectedCrypto(e.target.value)}
-                                  >
-                                    {cryptoCurrencies.map((crypto) => (
-                                      <MenuItem key={crypto.code} value={crypto.code}>
-                                        {crypto.code} - {crypto.name}
-                                      </MenuItem>
-                                    ))}
-                                  </Select>
-                                </FormControl>
-                              </Grid>
-                              <Grid item xs={12} sm={6}>
-                                <TextField
-                                  fullWidth
-                                  label="Wallet Address"
-                                  value={newCryptoWallet}
-                                  onChange={(e) => setNewCryptoWallet(e.target.value)}
-                                  placeholder="Enter wallet address"
-                                />
-                              </Grid>
-                              <Grid item xs={12} sm={2}>
-                                <Button
-                                  variant="contained"
-                                  color="primary"
-                                  onClick={handleAddCryptoWallet}
-                                  fullWidth
-                                >
-                                  Add
-                                </Button>
-                              </Grid>
-                            </Grid>
-                          )}
-                          
-                          <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-                            <Button
-                              variant="contained"
-                              color="primary"
-                              onClick={handleSaveSiteConfig}
-                              disabled={loading}
-                              startIcon={<SaveIcon />}
-                            >
-                              Save
-                            </Button>
-                            
-                            <Button
-                              variant="outlined"
-                              onClick={() => {
-                                setEditingConfig(false);
-                                if (siteConfig) {
-                                  setSiteName(siteConfig.site_name);
-                                  setPaypalClientId(siteConfig.paypal_client_id);
-                                  setStripePublishableKey(siteConfig.stripe_publishable_key || '');
-                                  setStripeSecretKey(siteConfig.stripe_secret_key || '');
-                                  setTelegramUsername(siteConfig.telegram_username);
-                                  setVideoListTitle(siteConfig.video_list_title || 'Available Videos');
-                                  setEmailHost(siteConfig.email_host || 'smtp.gmail.com');
-                                  setEmailPort(siteConfig.email_port || '587');
-                                  setEmailSecure(siteConfig.email_secure || false);
-                                  setEmailUser(siteConfig.email_user || '');
-                                  setEmailPass(siteConfig.email_pass || '');
-                                  setEmailFrom(siteConfig.email_from || '');
-                                }
-                              }}
-                              startIcon={<CancelIcon />}
-                            >
-                              Cancel
-                            </Button>
-                          </Box>
-                        </Box>
-                      ) : (
-                        <Box>
-                          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-                            <Typography variant="subtitle1" gutterBottom>
-                              <strong>Site Name:</strong> {siteConfig?.site_name || 'Not set'}
-                            </Typography>
-                            
-                            <Typography variant="subtitle1" gutterBottom>
-                              <strong>PayPal Client ID:</strong> {siteConfig?.paypal_client_id || 'Not set'}
-                            </Typography>
-                            
-                            <Typography variant="subtitle1">
-                              <strong>Stripe Publishable Key:</strong> {siteConfig?.stripe_publishable_key || 'Not set'}
-                            </Typography>
-                            
-                            <Typography variant="subtitle1">
-                              <strong>Stripe Secret Key:</strong> {siteConfig?.stripe_secret_key ? '•••••••••••••••••••••' : 'Not set'}
-                            </Typography>
-                            
-                            <Typography variant="subtitle1">
-                              <strong>Telegram Username:</strong> {siteConfig?.telegram_username ? `@${siteConfig.telegram_username}` : 'Not set'}
-                            </Typography>
-                            
-                            <Typography variant="subtitle1" gutterBottom>
-                              <strong>Video List Title:</strong> {siteConfig?.video_list_title || 'Not set'}
-                            </Typography>
-                            
-                            <Typography variant="subtitle1" gutterBottom sx={{ mt: 2, fontWeight: 'bold' }}>
-                              Email Configuration (PayPal):
-                            </Typography>
-                            
-                            <Typography variant="subtitle1">
-                              <strong>SMTP Host:</strong> {siteConfig?.email_host || 'Not set'}
-                            </Typography>
-                            
-                            <Typography variant="subtitle1">
-                              <strong>SMTP Port:</strong> {siteConfig?.email_port || 'Not set'}
-                            </Typography>
-                            
-                            <Typography variant="subtitle1">
-                              <strong>Secure Connection:</strong> {siteConfig?.email_secure ? 'Yes' : 'No'}
-                            </Typography>
-                            
-                            <Typography variant="subtitle1">
-                              <strong>Email User:</strong> {siteConfig?.email_user || 'Not set'}
-                            </Typography>
-                            
-                            <Typography variant="subtitle1">
-                              <strong>Email Password:</strong> {siteConfig?.email_pass ? '•••••••••••••' : 'Not set'}
-                            </Typography>
-                            
-                            <Typography variant="subtitle1" gutterBottom>
-                              <strong>From Email:</strong> {siteConfig?.email_from || 'Default (same as Email User)'}
-                            </Typography>
-                            
-                            <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
-                              <strong>Crypto Wallets:</strong>
-                            </Typography>
-                            
-                            {hasWallets ? (
-                              <Box sx={{ mt: 1 }}>
-                                {walletsToShow.map((wallet, index) => {
-                                  const [header, address] = wallet.split('\n');
-                                  return (
-                                    <Paper key={index} variant="outlined" sx={{ p: 1, mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <Box>
-                                        <Typography variant="subtitle2">{header}</Typography>
-                                        <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{address}</Typography>
-                                      </Box>
-                                      <IconButton 
-                                        color="error" 
-                                        onClick={() => handleRemoveCryptoWallet(index)}
-                                        size="small"
-                                        aria-label="remove wallet"
-                                      >
-                                        <DeleteIcon fontSize="small" />
-                                      </IconButton>
-                                    </Paper>
-                                  );
-                                })}
-                                {walletsFromDb.length === 0 && cryptoWallets.length > 0 && (
-                                  <Alert severity="info" variant="outlined" sx={{ mt: 1 }}>
-                                    <Typography variant="caption">
-                                      These wallets are currently stored in your browser only.
-                                    </Typography>
-                                  </Alert>
-                                )}
-                              </Box>
-                            ) : (
-                              <Typography variant="body2" color="text.secondary">
-                                No crypto wallets configured
-                              </Typography>
-                            )}
-                          </Paper>
-                        </Box>
-                      )}
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-            
-            {/* Users Management Section */}
-            <Grid item xs={12} lg={6}>
-              <Card elevation={2} sx={{ height: '100%' }}>
-                <CardContent>
-                  <Box sx={{ mb: 3 }}>
-                    <Grid container spacing={2} alignItems="center" justifyContent="space-between">
-                      <Grid item>
-                        <Typography variant="h5" component="h2" gutterBottom>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <GroupIcon sx={{ mr: 1 }} /> Manage Users
-                          </Box>
-                        </Typography>
-                      </Grid>
-                      {!newUser && (
-                        <Grid item>
-                          <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={() => setNewUser(true)}
-                            startIcon={<AddIcon />}
-                            size="small"
-                          >
-                            Add User
-                          </Button>
-                        </Grid>
-                      )}
-                    </Grid>
-                  </Box>
-                  
-                  <Collapse in={newUser}>
-                    <Paper sx={{ p: 2, mb: 3 }} elevation={0} variant="outlined">
-                      <Typography variant="h6" gutterBottom>
-                        {editingUser ? 'Edit User' : 'New User'}
+                  <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
+                    Crypto Wallets
+                  </Typography>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                      Add up to 5 cryptocurrency wallets for payment
+                    </Typography>
+                    <Alert severity="info" sx={{ mt: 1, mb: 1 }} variant="outlined">
+                      <Typography variant="caption">
+                        Note: If you're seeing errors about the "crypto" attribute, please make sure it's correctly 
+                        configured in your Appwrite database. Your wallets will be saved locally in the meantime.
                       </Typography>
-                      <Divider sx={{ mb: 2 }} />
-                      
-                      <Box component="form">
-                        <Grid container spacing={2}>
-                          <Grid item xs={12} sm={6}>
-                            <TextField
-                              fullWidth
-                              label="Name"
-                              value={userName}
-                              onChange={(e) => setUserName(e.target.value)}
-                              required
-                            />
-                          </Grid>
-                          <Grid item xs={12} sm={6}>
-                            <TextField
-                              fullWidth
-                              label="Email"
-                              type="email"
-                              value={userEmail}
-                              onChange={(e) => setUserEmail(e.target.value)}
-                              required
-                            />
-                          </Grid>
-                          <Grid item xs={12}>
-                            <TextField
-                              fullWidth
-                              label="Password"
-                              type="password"
-                              value={userPassword}
-                              onChange={(e) => setUserPassword(e.target.value)}
-                              required={!editingUser}
-                              helperText={editingUser ? "Leave blank to keep current password" : ""}
-                            />
-                          </Grid>
-                          <Grid item xs={12}>
-                            <Box sx={{ display: 'flex', gap: 2 }}>
-                              <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={handleSaveUser}
-                                disabled={loading}
-                                startIcon={<SaveIcon />}
-                              >
-                                {editingUser ? 'Update' : 'Create'}
-                              </Button>
-                              
-                              <Button
-                                variant="outlined"
-                                onClick={() => {
-                                  setNewUser(false);
-                                  setEditingUser(null);
-                                  setUserName('');
-                                  setUserEmail('');
-                                  setUserPassword('');
-                                }}
-                                startIcon={<CancelIcon />}
-                              >
-                                Cancel
-                              </Button>
-                            </Box>
-                          </Grid>
-                        </Grid>
-                      </Box>
-                    </Paper>
-                  </Collapse>
+                    </Alert>
+                  </Box>
                   
-                  {loading && !newUser && !editingUser ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-                      <CircularProgress />
-                    </Box>
-                  ) : (
-                    <TableContainer component={Paper} variant="outlined">
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Name</TableCell>
-                            <TableCell>Email</TableCell>
-                            <TableCell>Actions</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {users.map((user) => (
-                            <TableRow key={user.$id}>
-                              <TableCell>{user.name}</TableCell>
-                              <TableCell>{user.email}</TableCell>
-                              <TableCell>
-                                <IconButton 
-                                  color="primary" 
-                                  onClick={() => handleEditUser(user)}
-                                  aria-label="edit user"
-                                  size="small"
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton 
-                                  color="error" 
-                                  onClick={() => openDeleteDialog('user', user.$id)}
-                                  aria-label="delete user"
-                                  size="small"
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                          {users.length === 0 && (
-                            <TableRow>
-                              <TableCell colSpan={3} align="center">
-                                No users found
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
+                  <Box sx={{ mb: 2 }}>
+                    {cryptoWallets.map((wallet, index) => {
+                      const [header, address] = wallet.split('\n');
+                      return (
+                        <Paper key={index} variant="outlined" sx={{ p: 1, mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Box>
+                            <Typography variant="subtitle2">{header}</Typography>
+                            <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{address}</Typography>
+                          </Box>
+                          <IconButton 
+                            color="error" 
+                            onClick={() => {
+                              // Se as carteiras estão vindo do banco de dados, precisamos atualizar o estado local primeiro
+                              if (walletsFromDb.length > 0) {
+                                const updatedWallets = [...walletsFromDb];
+                                updatedWallets.splice(index, 1);
+                                setCryptoWallets(updatedWallets);
+                                
+                                // Salvar imediatamente no banco de dados
+                                handleSaveSiteConfig();
+                              } else {
+                                // Se são carteiras locais, apenas remover do estado
+                                handleRemoveCryptoWallet(index);
+                              }
+                            }}
+                            size="small"
+                            aria-label="remove wallet"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Paper>
+                      );
+                    })}
+                    
+                    {cryptoWallets.length === 0 && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        No crypto wallets added yet
+                      </Typography>
+                    )}
+                  </Box>
+                  
+                  {cryptoWallets.length < 5 && (
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid item xs={12} sm={4}>
+                        <FormControl fullWidth>
+                          <InputLabel id="crypto-select-label">Cryptocurrency</InputLabel>
+                          <Select
+                            labelId="crypto-select-label"
+                            value={selectedCrypto}
+                            label="Cryptocurrency"
+                            onChange={(e) => setSelectedCrypto(e.target.value)}
+                          >
+                            {cryptoCurrencies.map((crypto) => (
+                              <MenuItem key={crypto.code} value={crypto.code}>
+                                {crypto.code} - {crypto.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          label="Wallet Address"
+                          value={newCryptoWallet}
+                          onChange={(e) => setNewCryptoWallet(e.target.value)}
+                          placeholder="Enter wallet address"
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={2}>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          onClick={handleAddCryptoWallet}
+                          fullWidth
+                        >
+                          Add
+                        </Button>
+                      </Grid>
+                    </Grid>
                   )}
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
+                  
+                  <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={handleSaveSiteConfig}
+                      disabled={loading}
+                      startIcon={<SaveIcon />}
+                    >
+                      Save
+                    </Button>
+                    
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        setEditingConfig(false);
+                        if (siteConfig) {
+                          setSiteName(siteConfig.site_name);
+                          setPaypalClientId(siteConfig.paypal_client_id);
+                          setStripePublishableKey(siteConfig.stripe_publishable_key || '');
+                          setStripeSecretKey(siteConfig.stripe_secret_key || '');
+                          setTelegramUsername(siteConfig.telegram_username);
+                          setVideoListTitle(siteConfig.video_list_title || 'Available Videos');
+                          setEmailHost(siteConfig.email_host || 'smtp.gmail.com');
+                          setEmailPort(siteConfig.email_port || '587');
+                          setEmailSecure(siteConfig.email_secure || false);
+                          setEmailUser(siteConfig.email_user || '');
+                          setEmailPass(siteConfig.email_pass || '');
+                          setEmailFrom(siteConfig.email_from || '');
+                        }
+                      }}
+                      startIcon={<CancelIcon />}
+                    >
+                      Cancel
+                    </Button>
+                  </Box>
+                </Box>
+              ) : (
+                <Box>
+                  <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      <strong>Site Name:</strong> {siteConfig?.site_name || 'Not set'}
+                    </Typography>
+                    
+                    <Typography variant="subtitle1" gutterBottom>
+                      <strong>PayPal Client ID:</strong> {siteConfig?.paypal_client_id || 'Not set'}
+                    </Typography>
+                    
+                    <Typography variant="subtitle1">
+                      <strong>Stripe Publishable Key:</strong> {siteConfig?.stripe_publishable_key || 'Not set'}
+                    </Typography>
+                    
+                    <Typography variant="subtitle1">
+                      <strong>Stripe Secret Key:</strong> {siteConfig?.stripe_secret_key ? '•••••••••••••••••••••' : 'Not set'}
+                    </Typography>
+                    
+                    <Typography variant="subtitle1">
+                      <strong>Telegram Username:</strong> {siteConfig?.telegram_username ? `@${siteConfig.telegram_username}` : 'Not set'}
+                    </Typography>
+                    
+                    <Typography variant="subtitle1" gutterBottom>
+                      <strong>Video List Title:</strong> {siteConfig?.video_list_title || 'Not set'}
+                    </Typography>
+                    
+                    <Typography variant="subtitle1" gutterBottom sx={{ mt: 2, fontWeight: 'bold' }}>
+                      Email Configuration (PayPal):
+                    </Typography>
+                    
+                    <Typography variant="subtitle1">
+                      <strong>SMTP Host:</strong> {siteConfig?.email_host || 'Not set'}
+                    </Typography>
+                    
+                    <Typography variant="subtitle1">
+                      <strong>SMTP Port:</strong> {siteConfig?.email_port || 'Not set'}
+                    </Typography>
+                    
+                    <Typography variant="subtitle1">
+                      <strong>Secure Connection:</strong> {siteConfig?.email_secure ? 'Yes' : 'No'}
+                    </Typography>
+                    
+                    <Typography variant="subtitle1">
+                      <strong>Email User:</strong> {siteConfig?.email_user || 'Not set'}
+                    </Typography>
+                    
+                    <Typography variant="subtitle1">
+                      <strong>Email Password:</strong> {siteConfig?.email_pass ? '•••••••••••••' : 'Not set'}
+                    </Typography>
+                    
+                    <Typography variant="subtitle1" gutterBottom>
+                      <strong>From Email:</strong> {siteConfig?.email_from || 'Default (same as Email User)'}
+                    </Typography>
+                    
+                    <Typography variant="subtitle1" gutterBottom sx={{ mt: 2 }}>
+                      <strong>Crypto Wallets:</strong>
+                    </Typography>
+                    
+                    {hasWallets ? (
+                      <Box sx={{ mt: 1 }}>
+                        {walletsToShow.map((wallet, index) => {
+                          const [header, address] = wallet.split('\n');
+                          return (
+                            <Paper key={index} variant="outlined" sx={{ p: 1, mb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Box>
+                                <Typography variant="subtitle2">{header}</Typography>
+                                <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{address}</Typography>
+                              </Box>
+                              <IconButton 
+                                color="error" 
+                                onClick={() => handleRemoveCryptoWallet(index)}
+                                size="small"
+                                aria-label="remove wallet"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Paper>
+                          );
+                        })}
+                        {walletsFromDb.length === 0 && cryptoWallets.length > 0 && (
+                          <Alert severity="info" variant="outlined" sx={{ mt: 1 }}>
+                            <Typography variant="caption">
+                              These wallets are currently stored in your browser only.
+                            </Typography>
+                          </Alert>
+                        )}
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        No crypto wallets configured
+                      </Typography>
+                    )}
+                  </Paper>
+                </Box>
+              )}
+            </Paper>
+          </Box>
         </TabPanel>
       </Paper>
       
