@@ -844,45 +844,114 @@ const Admin: FC = () => {
       setLoading(true);
       setError(null);
       
-      // Construa o objeto com os dados necessários
-      const configData = {
-        site_name: siteName,
-        paypal_client_id: paypalClientId,
-        stripe_publishable_key: stripePublishableKey,
-        stripe_secret_key: stripeSecretKey,
-        telegram_username: telegramUsername,
-        video_list_title: videoListTitle || 'Available Videos',
-      };
-      
-      // Adicione campos opcionais com validação
+      // Primeiro, vamos verificar quais campos existem na coleção
       try {
-        // Tente primeiro salvar apenas os campos obrigatórios
+        // Se não existe configuração, vamos tentar criar com o mínimo possível
         if (!siteConfig) {
-          // Create new config
-          await databases.createDocument(
+          // Aqui assumimos que pelo menos o atributo site_name existe
+          const newConfig = await databases.createDocument(
             databaseId,
             siteConfigCollectionId,
             ID.unique(),
-            configData
+            { site_name: siteName || 'Site' }
           );
           
-          // Se chegou aqui, foi salvo com sucesso, então atualize a variável siteConfig
+          // Atualize o ID para usar nas próximas operações
           await fetchSiteConfig();
-        } else {
-          // Update existing config
+        }
+        
+        // Agora vamos tentar salvar cada campo separadamente
+        // para identificar quais atributos existem
+        const fieldsToTry = [
+          { name: 'site_name', value: siteName },
+          { name: 'paypal_client_id', value: paypalClientId },
+          { name: 'stripe_publishable_key', value: stripePublishableKey },
+          { name: 'stripe_secret_key', value: stripeSecretKey },
+          { name: 'telegram_username', value: telegramUsername },
+          { name: 'video_list_title', value: videoListTitle },
+        ];
+        
+        let successCount = 0;
+        let errorCount = 0;
+        let successFields: string[] = [];
+        let errorFields: string[] = [];
+        
+        // Para cada campo, tenta atualizar individualmente
+        for (const field of fieldsToTry) {
+          if (field.value !== undefined && field.value !== null) {
+            try {
+              const updateData = { [field.name]: field.value };
+              await databases.updateDocument(
+                databaseId,
+                siteConfigCollectionId,
+                siteConfig?.$id || '',
+                updateData
+              );
+              successCount++;
+              successFields.push(field.name);
+              console.log(`Campo ${field.name} salvo com sucesso.`);
+            } catch (err) {
+              errorCount++;
+              errorFields.push(field.name);
+              console.log(`Campo ${field.name} não pôde ser salvo. Atributo provavelmente não existe.`);
+              // Continue sem quebrar o processo
+            }
+          }
+        }
+        
+        // Tenta salvar configurações de email como um grupo
+        try {
+          const emailConfig = {
+            email_host: emailHost,
+            email_port: emailPort,
+            email_secure: emailSecure,
+            email_user: emailUser,
+            email_pass: emailPass,
+            email_from: emailFrom,
+          };
+          
           await databases.updateDocument(
             databaseId,
             siteConfigCollectionId,
-            siteConfig.$id,
-            configData
+            siteConfig?.$id || '',
+            emailConfig
           );
+          successCount += 6;
+          successFields.push('email_config');
+        } catch (err) {
+          // Tenta salvar cada campo de email individualmente
+          const emailFields = [
+            { name: 'email_host', value: emailHost },
+            { name: 'email_port', value: emailPort },
+            { name: 'email_secure', value: emailSecure },
+            { name: 'email_user', value: emailUser },
+            { name: 'email_pass', value: emailPass },
+            { name: 'email_from', value: emailFrom },
+          ];
+          
+          for (const field of emailFields) {
+            if (field.value !== undefined && field.value !== null) {
+              try {
+                const updateData = { [field.name]: field.value };
+                await databases.updateDocument(
+                  databaseId,
+                  siteConfigCollectionId,
+                  siteConfig?.$id || '',
+                  updateData
+                );
+                successCount++;
+                successFields.push(field.name);
+              } catch (err) {
+                errorCount++;
+                errorFields.push(field.name);
+                // Continue sem quebrar o processo
+              }
+            }
+          }
         }
         
-        // Agora tente adicionar os campos opcionais um por um
-        // Se ocorrer um erro, significa que o atributo não existe
-        
-        // Adicionar crypto
-        if (cryptoWallets.length > 0) {
+        // Tenta salvar crypto se houver valores
+        if (cryptoWallets && cryptoWallets.length > 0) {
           try {
             await databases.updateDocument(
               databaseId,
@@ -890,53 +959,42 @@ const Admin: FC = () => {
               siteConfig?.$id || '',
               { crypto: cryptoWallets }
             );
-          } catch (error) {
-            console.error("Erro ao salvar carteiras crypto:", error);
-            showFeedback('As carteiras crypto não foram salvas. Atributo "crypto" não existe na coleção.', 'error');
+            successCount++;
+            successFields.push('crypto');
+          } catch (err) {
+            console.log(`Campo crypto não pôde ser salvo. Atributo provavelmente não existe.`);
+            errorCount++;
+            errorFields.push('crypto');
           }
         }
         
-        // Configurações de email
-        const emailConfig = {
-          email_host: emailHost,
-          email_port: emailPort,
-          email_secure: emailSecure,
-          email_user: emailUser,
-          email_pass: emailPass,
-          email_from: emailFrom,
-        };
-        
-        try {
-          await databases.updateDocument(
-            databaseId,
-            siteConfigCollectionId,
-            siteConfig?.$id || '',
-            emailConfig
-          );
-        } catch (error) {
-          console.error("Erro ao salvar configurações de email:", error);
-          showFeedback('Configurações de email não foram salvas. Alguns atributos não existem na coleção.', 'error');
-        }
-        
-      } catch (err: any) {
-        // Se ocorreu um erro ao salvar os campos obrigatórios, mostre uma mensagem específica
-        console.error('Erro ao salvar configurações básicas:', err);
-        
-        // Verifica se o erro é sobre um atributo não encontrado
-        if (err.message && err.message.includes('Attribute')) {
-          setError(`Erro ao salvar: Atributo não encontrado. Execute "Initialize Schema" primeiro e crie o atributo manualmente: ${err.message}`);
-          showFeedback('Erro ao salvar: Atributo não encontrado', 'error');
+        if (successCount > 0) {
+          if (errorCount > 0) {
+            showFeedback(`${successCount} campos salvos com sucesso. ${errorCount} campos não puderam ser salvos.`, 'success');
+            console.log('Campos salvos:', successFields.join(', '));
+            console.log('Campos não salvos:', errorFields.join(', '));
+            // Mostrar mensagem informativa
+            setError(`Alguns campos não puderam ser salvos porque os atributos não existem na coleção: ${errorFields.join(', ')}`);
+          } else {
+            showFeedback('Todas as configurações foram salvas com sucesso!', 'success');
+          }
+          refreshConfig(); // Update the context with new config
+          setEditingConfig(false);
         } else {
-          setError(`Erro ao salvar configurações: ${err.message}`);
-          showFeedback('Falha ao salvar configurações do site', 'error');
+          setError("Nenhum campo foi salvo. Verifique se os atributos necessários existem na coleção.");
+          showFeedback('Falha ao salvar configurações', 'error');
+        }
+      } catch (err: any) {
+        console.error('Erro ao verificar/salvar configurações:', err);
+        
+        if (err.message && err.message.includes('Attribute')) {
+          setError(`Certifique-se de que pelo menos o atributo 'site_name' existe na coleção. Erro: ${err.message}`);
+        } else {
+          setError(`Erro ao salvar: ${err.message}`);
         }
         
-        return;
+        showFeedback('Falha ao salvar configurações', 'error');
       }
-      
-      showFeedback('Configurações do site salvas com sucesso', 'success');
-      refreshConfig(); // Update the context with new config
-      setEditingConfig(false);
     } catch (err: any) {
       console.error('Erro ao salvar configurações do site:', err);
       setError(`Erro ao salvar: ${err.message}`);
