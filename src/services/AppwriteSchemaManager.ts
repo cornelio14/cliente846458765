@@ -1,11 +1,43 @@
 import { databases, databaseId, videoCollectionId, userCollectionId, siteConfigCollectionId, sessionCollectionId } from './node_appwrite';
-import { ID } from 'appwrite';
+import { ID, Client, Databases } from 'appwrite';
+
+// Define interfaces for attribute types
+interface BaseAttribute {
+  key: string;
+  type: string;
+  required: boolean;
+  defaultValue?: any;
+}
+
+interface NumberAttribute extends BaseAttribute {
+  min?: number;
+  max?: number;
+}
+
+interface StringArrayAttribute extends BaseAttribute {
+  array: boolean;
+}
+
+type AttributeType = BaseAttribute | NumberAttribute | StringArrayAttribute;
 
 /**
  * Service to manage Appwrite database schema
  * Ensures all required attributes exist in collections
  */
 export class AppwriteSchemaManager {
+  /**
+   * Get a fresh Appwrite databases instance
+   */
+  private static getDatabasesInstance(): Databases {
+    const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT;
+    const projectId = import.meta.env.VITE_APPWRITE_PROJECT_ID;
+    
+    const client = new Client();
+    client.setEndpoint(endpoint).setProject(projectId);
+    
+    return new Databases(client);
+  }
+  
   /**
    * Initialize all collections and ensure required attributes exist
    */
@@ -34,8 +66,11 @@ export class AppwriteSchemaManager {
     try {
       console.log('Checking video collection attributes...');
       
+      // Get a fresh databases instance
+      const db = this.getDatabasesInstance();
+      
       // Define required attributes for video collection
-      const requiredAttributes = [
+      const requiredAttributes: AttributeType[] = [
         { key: 'title', type: 'string', required: true },
         { key: 'description', type: 'string', required: false },
         { key: 'price', type: 'double', required: true, min: 0 },
@@ -49,7 +84,8 @@ export class AppwriteSchemaManager {
       ];
       
       // Get existing attributes
-      const collection = await databases.getCollection(databaseId, videoCollectionId);
+      // Use type assertion since getCollection may not be properly typed in the SDK
+      const collection = await (db as any).getCollection(databaseId, videoCollectionId);
       const existingAttributes = collection.attributes;
       
       // Check each required attribute
@@ -62,7 +98,7 @@ export class AppwriteSchemaManager {
           // Create the attribute based on its type
           switch (attr.type) {
             case 'string':
-              await databases.createStringAttribute(
+              await (db as any).createStringAttribute(
                 databaseId,
                 videoCollectionId,
                 attr.key,
@@ -72,29 +108,35 @@ export class AppwriteSchemaManager {
               );
               break;
             case 'integer':
-              await databases.createIntegerAttribute(
-                databaseId,
-                videoCollectionId,
-                attr.key,
-                attr.required,
-                attr.defaultValue || null,
-                attr.min,
-                attr.max
-              );
+              {
+                const numAttr = attr as NumberAttribute;
+                await (db as any).createIntegerAttribute(
+                  databaseId,
+                  videoCollectionId,
+                  attr.key,
+                  attr.required,
+                  attr.defaultValue || null,
+                  numAttr.min || null,
+                  numAttr.max || null
+                );
+              }
               break;
             case 'double':
-              await databases.createFloatAttribute(
-                databaseId,
-                videoCollectionId,
-                attr.key,
-                attr.required,
-                attr.defaultValue || null,
-                attr.min,
-                attr.max
-              );
+              {
+                const numAttr = attr as NumberAttribute;
+                await (db as any).createFloatAttribute(
+                  databaseId,
+                  videoCollectionId,
+                  attr.key,
+                  attr.required,
+                  attr.defaultValue || null,
+                  numAttr.min || null,
+                  numAttr.max || null
+                );
+              }
               break;
             case 'boolean':
-              await databases.createBooleanAttribute(
+              await (db as any).createBooleanAttribute(
                 databaseId,
                 videoCollectionId,
                 attr.key,
@@ -103,7 +145,7 @@ export class AppwriteSchemaManager {
               );
               break;
             case 'datetime':
-              await databases.createDatetimeAttribute(
+              await (db as any).createDatetimeAttribute(
                 databaseId,
                 videoCollectionId,
                 attr.key,
@@ -131,15 +173,18 @@ export class AppwriteSchemaManager {
     try {
       console.log('Checking site config collection attributes...');
       
+      // Get a fresh databases instance
+      const db = this.getDatabasesInstance();
+      
       // Define required attributes for site config collection
-      const requiredAttributes = [
+      const requiredAttributes: AttributeType[] = [
         { key: 'site_name', type: 'string', required: true },
         { key: 'paypal_client_id', type: 'string', required: false },
         { key: 'stripe_publishable_key', type: 'string', required: false },
         { key: 'stripe_secret_key', type: 'string', required: false },
         { key: 'telegram_username', type: 'string', required: false },
         { key: 'video_list_title', type: 'string', required: false },
-        { key: 'crypto', type: 'string[]', required: false, array: true },
+        { key: 'crypto', type: 'string[]', required: false, array: true } as StringArrayAttribute,
         { key: 'email_host', type: 'string', required: false },
         { key: 'email_port', type: 'string', required: false },
         { key: 'email_secure', type: 'boolean', required: false },
@@ -148,8 +193,8 @@ export class AppwriteSchemaManager {
         { key: 'email_from', type: 'string', required: false }
       ];
       
-      // Get existing attributes - use databases directly
-      const collection = await databases.getCollection(databaseId, siteConfigCollectionId);
+      // Get existing attributes
+      const collection = await (db as any).getCollection(databaseId, siteConfigCollectionId);
       const existingAttributes = collection.attributes;
       
       // Check each required attribute
@@ -161,19 +206,20 @@ export class AppwriteSchemaManager {
           
           // Create the attribute based on its type
           if (attr.type === 'string[]') {
-            await databases.createStringAttribute(
+            const arrayAttr = attr as StringArrayAttribute;
+            await (db as any).createStringAttribute(
               databaseId,
               siteConfigCollectionId,
               attr.key,
               attr.required,
               null,
               255,
-              true // isArray
+              arrayAttr.array
             );
           } else {
             switch (attr.type) {
               case 'string':
-                await databases.createStringAttribute(
+                await (db as any).createStringAttribute(
                   databaseId,
                   siteConfigCollectionId,
                   attr.key,
@@ -183,7 +229,7 @@ export class AppwriteSchemaManager {
                 );
                 break;
               case 'boolean':
-                await databases.createBooleanAttribute(
+                await (db as any).createBooleanAttribute(
                   databaseId,
                   siteConfigCollectionId,
                   attr.key,
@@ -212,16 +258,19 @@ export class AppwriteSchemaManager {
     try {
       console.log('Checking user collection attributes...');
       
+      // Get a fresh databases instance
+      const db = this.getDatabasesInstance();
+      
       // Define required attributes for user collection
-      const requiredAttributes = [
+      const requiredAttributes: AttributeType[] = [
         { key: 'email', type: 'string', required: true },
         { key: 'name', type: 'string', required: true },
         { key: 'password', type: 'string', required: true },
         { key: 'created_at', type: 'datetime', required: false }
       ];
       
-      // Get existing attributes - use databases directly
-      const collection = await databases.getCollection(databaseId, userCollectionId);
+      // Get existing attributes
+      const collection = await (db as any).getCollection(databaseId, userCollectionId);
       const existingAttributes = collection.attributes;
       
       // Check each required attribute
@@ -234,7 +283,7 @@ export class AppwriteSchemaManager {
           // Create the attribute based on its type
           switch (attr.type) {
             case 'string':
-              await databases.createStringAttribute(
+              await (db as any).createStringAttribute(
                 databaseId,
                 userCollectionId,
                 attr.key,
@@ -244,7 +293,7 @@ export class AppwriteSchemaManager {
               );
               break;
             case 'datetime':
-              await databases.createDatetimeAttribute(
+              await (db as any).createDatetimeAttribute(
                 databaseId,
                 userCollectionId,
                 attr.key,
@@ -272,8 +321,11 @@ export class AppwriteSchemaManager {
     try {
       console.log('Checking session collection attributes...');
       
+      // Get a fresh databases instance
+      const db = this.getDatabasesInstance();
+      
       // Define required attributes for session collection
-      const requiredAttributes = [
+      const requiredAttributes: AttributeType[] = [
         { key: 'user_id', type: 'string', required: true },
         { key: 'token', type: 'string', required: true },
         { key: 'expires_at', type: 'datetime', required: true },
@@ -282,8 +334,8 @@ export class AppwriteSchemaManager {
         { key: 'user_agent', type: 'string', required: false }
       ];
       
-      // Get existing attributes - use databases directly
-      const collection = await databases.getCollection(databaseId, sessionCollectionId);
+      // Get existing attributes
+      const collection = await (db as any).getCollection(databaseId, sessionCollectionId);
       const existingAttributes = collection.attributes;
       
       // Check each required attribute
@@ -296,7 +348,7 @@ export class AppwriteSchemaManager {
           // Create the attribute based on its type
           switch (attr.type) {
             case 'string':
-              await databases.createStringAttribute(
+              await (db as any).createStringAttribute(
                 databaseId,
                 sessionCollectionId,
                 attr.key,
@@ -306,7 +358,7 @@ export class AppwriteSchemaManager {
               );
               break;
             case 'datetime':
-              await databases.createDatetimeAttribute(
+              await (db as any).createDatetimeAttribute(
                 databaseId,
                 sessionCollectionId,
                 attr.key,
