@@ -29,6 +29,27 @@ export enum SortOption {
 }
 
 export class VideoService {
+  // Método para normalizar os objetos de vídeo
+  private static normalizeVideo(video: any): Video {
+    // Garantir consistência nos campos
+    return {
+      $id: video.$id,
+      title: video.title || 'Untitled',
+      description: video.description || '',
+      price: typeof video.price === 'number' ? video.price : parseFloat(video.price || '0'),
+      duration: video.duration || '00:00',
+      videoFileId: video.videoFileId || video.video_id || null,
+      video_id: video.video_id || video.videoFileId || null,
+      thumbnailFileId: video.thumbnailFileId || video.thumbnail_id || null,
+      thumbnail_id: video.thumbnail_id || video.thumbnailFileId || null,
+      thumbnailUrl: video.thumbnailUrl || null,
+      isPurchased: video.isPurchased || false,
+      createdAt: video.createdAt || video.created_at || new Date().toISOString(),
+      views: typeof video.views === 'number' ? video.views : 0,
+      product_link: video.product_link || ''
+    };
+  }
+
   // Get all videos with sorting options
   static async getAllVideos(sortOption: SortOption = SortOption.NEWEST, searchQuery: string = ''): Promise<Video[]> {
     try {
@@ -41,7 +62,7 @@ export class VideoService {
       );
       
       console.log(`Found ${response.documents.length} videos in database`);
-      let videos = response.documents as unknown as Video[];
+      let videos = response.documents.map(doc => this.normalizeVideo(doc));
       
       // Apply client-side search if query is provided
       if (searchQuery && searchQuery.trim() !== '') {
@@ -73,9 +94,6 @@ export class VideoService {
           // Use placeholder if no thumbnail ID
           video.thumbnailUrl = 'https://via.placeholder.com/300x180?text=Video+Thumbnail';
         }
-        
-        // Ensure views is a number
-        video.views = video.views || 0;
       }
       
       // Sort videos based on option
@@ -122,11 +140,13 @@ export class VideoService {
   // Get a single video by ID
   static async getVideo(videoId: string): Promise<Video | null> {
     try {
-      const video = await databases.getDocument(
+      const videoDoc = await databases.getDocument(
         databaseId,
         videoCollectionId,
         videoId
-      ) as unknown as Video;
+      );
+      
+      const video = this.normalizeVideo(videoDoc);
       
       // Log video details for debugging
       console.log(`Getting video ${videoId}: title=${video.title}, video_id=${video.video_id}, videoFileId=${video.videoFileId}, thumbnail_id=${video.thumbnail_id}, thumbnailFileId=${video.thumbnailFileId}`);
@@ -225,13 +245,15 @@ export class VideoService {
         return null;
       }
       
-      // Check for the video file ID using both naming conventions
+      // Verificando todos os possíveis campos onde o ID do vídeo pode estar
       const videoFileId = video.video_id || video.videoFileId;
       
       if (!videoFileId) {
         console.error(`Video ${videoId} has no video file ID (checked both video_id and videoFileId)`);
         return null;
       }
+      
+      console.log(`Attempting to get file URL for video ID: ${videoFileId} from bucket: ${videosBucketId}`);
       
       // Get video file URL - não verificamos mais o status de compra
       try {
@@ -240,6 +262,7 @@ export class VideoService {
         return fileUrl.href;
       } catch (error) {
         console.error(`Error getting file URL:`, error);
+        console.error(`Bucket ID: ${videosBucketId}, Video File ID: ${videoFileId}`);
         return null;
       }
     } catch (error) {
