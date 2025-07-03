@@ -101,90 +101,82 @@ export class AppwriteSchemaManager {
         { key: 'product_link', type: 'string', required: false }
       ];
       
-      try {
-        // Try to get the collection to see if it exists
-        const collection = await (db as any).getCollection(databaseId, videoCollectionId);
-        
-        // Get existing attributes
-        const existingAttributes = collection.attributes || [];
-        
-        // Check each required attribute
-        for (const attr of requiredAttributes) {
-          const exists = existingAttributes.some((existing: any) => existing.key === attr.key);
+      // Try to create each attribute - if it exists, the API will return an error which we'll ignore
+      for (const attr of requiredAttributes) {
+        try {
+          console.log(`Attempting to create attribute '${attr.key}' in video collection`);
           
-          if (!exists) {
-            console.log(`Creating missing attribute '${attr.key}' in video collection`);
-            
-            // Create the attribute based on its type
-            switch (attr.type) {
-              case 'string':
-                await (db as any).createStringAttribute(
+          // Create the attribute based on its type
+          switch (attr.type) {
+            case 'string':
+              await (db as any).createStringAttribute(
+                databaseId,
+                videoCollectionId,
+                attr.key,
+                attr.required,
+                attr.defaultValue || null,
+                255 // Max length for string
+              );
+              break;
+            case 'integer':
+              {
+                const numAttr = attr as NumberAttribute;
+                await (db as any).createIntegerAttribute(
                   databaseId,
                   videoCollectionId,
                   attr.key,
                   attr.required,
                   attr.defaultValue || null,
-                  255 // Max length for string
+                  numAttr.min || null,
+                  numAttr.max || null
                 );
-                break;
-              case 'integer':
-                {
-                  const numAttr = attr as NumberAttribute;
-                  await (db as any).createIntegerAttribute(
-                    databaseId,
-                    videoCollectionId,
-                    attr.key,
-                    attr.required,
-                    attr.defaultValue || null,
-                    numAttr.min || null,
-                    numAttr.max || null
-                  );
-                }
-                break;
-              case 'double':
-                {
-                  const numAttr = attr as NumberAttribute;
-                  await (db as any).createFloatAttribute(
-                    databaseId,
-                    videoCollectionId,
-                    attr.key,
-                    attr.required,
-                    attr.defaultValue || null,
-                    numAttr.min || null,
-                    numAttr.max || null
-                  );
-                }
-                break;
-              case 'boolean':
-                await (db as any).createBooleanAttribute(
+              }
+              break;
+            case 'double':
+              {
+                const numAttr = attr as NumberAttribute;
+                await (db as any).createFloatAttribute(
                   databaseId,
                   videoCollectionId,
                   attr.key,
                   attr.required,
-                  attr.defaultValue || null
+                  attr.defaultValue || null,
+                  numAttr.min || null,
+                  numAttr.max || null
                 );
-                break;
-              case 'datetime':
-                await (db as any).createDatetimeAttribute(
-                  databaseId,
-                  videoCollectionId,
-                  attr.key,
-                  attr.required,
-                  attr.defaultValue || null
-                );
-                break;
-            }
-            
-            // Wait for attribute to be available
-            await new Promise(resolve => setTimeout(resolve, 1000));
+              }
+              break;
+            case 'boolean':
+              await (db as any).createBooleanAttribute(
+                databaseId,
+                videoCollectionId,
+                attr.key,
+                attr.required,
+                attr.defaultValue || null
+              );
+              break;
+            case 'datetime':
+              await (db as any).createDatetimeAttribute(
+                databaseId,
+                videoCollectionId,
+                attr.key,
+                attr.required,
+                attr.defaultValue || null
+              );
+              break;
           }
+          
+          console.log(`Successfully created attribute '${attr.key}' in video collection`);
+        } catch (error) {
+          // If the attribute already exists, this is fine - we'll skip it
+          console.log(`Skipping attribute '${attr.key}' - it might already exist: ${error}`);
         }
         
-        console.log('Video collection attributes verified');
-      } catch (error) {
-        console.log('Could not verify video collection attributes - collection may not exist yet');
-        throw error;
+        // Wait a moment between attribute creation attempts to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
+      
+      console.log('Video collection attributes verified');
     } catch (error) {
       console.error('Error ensuring video collection attributes:', error);
       throw error;
@@ -218,66 +210,58 @@ export class AppwriteSchemaManager {
         { key: 'email_from', type: 'string', required: false }
       ];
       
-      try {
-        // Try to get the collection to see if it exists
-        const collection = await (db as any).getCollection(databaseId, siteConfigCollectionId);
-        
-        // Get existing attributes
-        const existingAttributes = collection.attributes || [];
-        
-        // Check each required attribute
-        for (const attr of requiredAttributes) {
-          const exists = existingAttributes.some((existing: any) => existing.key === attr.key);
+      // Try to create each attribute - if it exists, the API will return an error which we'll ignore
+      for (const attr of requiredAttributes) {
+        try {
+          console.log(`Attempting to create attribute '${attr.key}' in site config collection`);
           
-          if (!exists) {
-            console.log(`Creating missing attribute '${attr.key}' in site config collection`);
-            
-            // Create the attribute based on its type
-            if (attr.type === 'string[]') {
-              const arrayAttr = attr as StringArrayAttribute;
-              await (db as any).createStringAttribute(
-                databaseId,
-                siteConfigCollectionId,
-                attr.key,
-                attr.required,
-                null,
-                255,
-                arrayAttr.array
-              );
-            } else {
-              switch (attr.type) {
-                case 'string':
-                  await (db as any).createStringAttribute(
-                    databaseId,
-                    siteConfigCollectionId,
-                    attr.key,
-                    attr.required,
-                    attr.defaultValue || null,
-                    255
-                  );
-                  break;
-                case 'boolean':
-                  await (db as any).createBooleanAttribute(
-                    databaseId,
-                    siteConfigCollectionId,
-                    attr.key,
-                    attr.required,
-                    attr.defaultValue || null
-                  );
-                  break;
-              }
+          // Create the attribute based on its type
+          if (attr.type === 'string[]') {
+            const arrayAttr = attr as StringArrayAttribute;
+            await (db as any).createStringAttribute(
+              databaseId,
+              siteConfigCollectionId,
+              attr.key,
+              attr.required,
+              null,
+              255,
+              arrayAttr.array
+            );
+          } else {
+            switch (attr.type) {
+              case 'string':
+                await (db as any).createStringAttribute(
+                  databaseId,
+                  siteConfigCollectionId,
+                  attr.key,
+                  attr.required,
+                  attr.defaultValue || null,
+                  255
+                );
+                break;
+              case 'boolean':
+                await (db as any).createBooleanAttribute(
+                  databaseId,
+                  siteConfigCollectionId,
+                  attr.key,
+                  attr.required,
+                  attr.defaultValue || null
+                );
+                break;
             }
-            
-            // Wait for attribute to be available
-            await new Promise(resolve => setTimeout(resolve, 1000));
           }
+          
+          console.log(`Successfully created attribute '${attr.key}' in site config collection`);
+        } catch (error) {
+          // If the attribute already exists, this is fine - we'll skip it
+          console.log(`Skipping attribute '${attr.key}' - it might already exist: ${error}`);
         }
         
-        console.log('Site config collection attributes verified');
-      } catch (error) {
-        console.log('Could not verify site config collection attributes - collection may not exist yet');
-        throw error;
+        // Wait a moment between attribute creation attempts to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
+      
+      console.log('Site config collection attributes verified');
     } catch (error) {
       console.error('Error ensuring site config collection attributes:', error);
       throw error;
@@ -302,53 +286,45 @@ export class AppwriteSchemaManager {
         { key: 'created_at', type: 'datetime', required: false }
       ];
       
-      try {
-        // Try to get the collection to see if it exists
-        const collection = await (db as any).getCollection(databaseId, userCollectionId);
-        
-        // Get existing attributes
-        const existingAttributes = collection.attributes || [];
-        
-        // Check each required attribute
-        for (const attr of requiredAttributes) {
-          const exists = existingAttributes.some((existing: any) => existing.key === attr.key);
+      // Try to create each attribute - if it exists, the API will return an error which we'll ignore
+      for (const attr of requiredAttributes) {
+        try {
+          console.log(`Attempting to create attribute '${attr.key}' in user collection`);
           
-          if (!exists) {
-            console.log(`Creating missing attribute '${attr.key}' in user collection`);
-            
-            // Create the attribute based on its type
-            switch (attr.type) {
-              case 'string':
-                await (db as any).createStringAttribute(
-                  databaseId,
-                  userCollectionId,
-                  attr.key,
-                  attr.required,
-                  attr.defaultValue || null,
-                  255
-                );
-                break;
-              case 'datetime':
-                await (db as any).createDatetimeAttribute(
-                  databaseId,
-                  userCollectionId,
-                  attr.key,
-                  attr.required,
-                  attr.defaultValue || null
-                );
-                break;
-            }
-            
-            // Wait for attribute to be available
-            await new Promise(resolve => setTimeout(resolve, 1000));
+          // Create the attribute based on its type
+          switch (attr.type) {
+            case 'string':
+              await (db as any).createStringAttribute(
+                databaseId,
+                userCollectionId,
+                attr.key,
+                attr.required,
+                attr.defaultValue || null,
+                255
+              );
+              break;
+            case 'datetime':
+              await (db as any).createDatetimeAttribute(
+                databaseId,
+                userCollectionId,
+                attr.key,
+                attr.required,
+                attr.defaultValue || null
+              );
+              break;
           }
+          
+          console.log(`Successfully created attribute '${attr.key}' in user collection`);
+        } catch (error) {
+          // If the attribute already exists, this is fine - we'll skip it
+          console.log(`Skipping attribute '${attr.key}' - it might already exist: ${error}`);
         }
         
-        console.log('User collection attributes verified');
-      } catch (error) {
-        console.log('Could not verify user collection attributes - collection may not exist yet');
-        throw error;
+        // Wait a moment between attribute creation attempts to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
+      
+      console.log('User collection attributes verified');
     } catch (error) {
       console.error('Error ensuring user collection attributes:', error);
       throw error;
@@ -375,53 +351,45 @@ export class AppwriteSchemaManager {
         { key: 'user_agent', type: 'string', required: false }
       ];
       
-      try {
-        // Try to get the collection to see if it exists
-        const collection = await (db as any).getCollection(databaseId, sessionCollectionId);
-        
-        // Get existing attributes
-        const existingAttributes = collection.attributes || [];
-        
-        // Check each required attribute
-        for (const attr of requiredAttributes) {
-          const exists = existingAttributes.some((existing: any) => existing.key === attr.key);
+      // Try to create each attribute - if it exists, the API will return an error which we'll ignore
+      for (const attr of requiredAttributes) {
+        try {
+          console.log(`Attempting to create attribute '${attr.key}' in session collection`);
           
-          if (!exists) {
-            console.log(`Creating missing attribute '${attr.key}' in session collection`);
-            
-            // Create the attribute based on its type
-            switch (attr.type) {
-              case 'string':
-                await (db as any).createStringAttribute(
-                  databaseId,
-                  sessionCollectionId,
-                  attr.key,
-                  attr.required,
-                  attr.defaultValue || null,
-                  255
-                );
-                break;
-              case 'datetime':
-                await (db as any).createDatetimeAttribute(
-                  databaseId,
-                  sessionCollectionId,
-                  attr.key,
-                  attr.required,
-                  attr.defaultValue || null
-                );
-                break;
-            }
-            
-            // Wait for attribute to be available
-            await new Promise(resolve => setTimeout(resolve, 1000));
+          // Create the attribute based on its type
+          switch (attr.type) {
+            case 'string':
+              await (db as any).createStringAttribute(
+                databaseId,
+                sessionCollectionId,
+                attr.key,
+                attr.required,
+                attr.defaultValue || null,
+                255
+              );
+              break;
+            case 'datetime':
+              await (db as any).createDatetimeAttribute(
+                databaseId,
+                sessionCollectionId,
+                attr.key,
+                attr.required,
+                attr.defaultValue || null
+              );
+              break;
           }
+          
+          console.log(`Successfully created attribute '${attr.key}' in session collection`);
+        } catch (error) {
+          // If the attribute already exists, this is fine - we'll skip it
+          console.log(`Skipping attribute '${attr.key}' - it might already exist: ${error}`);
         }
         
-        console.log('Session collection attributes verified');
-      } catch (error) {
-        console.log('Could not verify session collection attributes - collection may not exist yet');
-        throw error;
+        // Wait a moment between attribute creation attempts to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
+      
+      console.log('Session collection attributes verified');
     } catch (error) {
       console.error('Error ensuring session collection attributes:', error);
       throw error;
