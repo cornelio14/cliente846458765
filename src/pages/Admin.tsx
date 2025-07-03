@@ -881,10 +881,11 @@ const Admin: FC = () => {
           if (field.value !== undefined && field.value !== null) {
             try {
               const updateData = { [field.name]: field.value };
+              const configId = siteConfig ? siteConfig.$id : '';
               await databases.updateDocument(
                 databaseId,
                 siteConfigCollectionId,
-                siteConfig?.$id || '',
+                configId,
                 updateData
               );
               successCount++;
@@ -910,12 +911,13 @@ const Admin: FC = () => {
             email_from: emailFrom,
           };
           
-          await databases.updateDocument(
-            databaseId,
-            siteConfigCollectionId,
-            siteConfig?.$id || '',
-            emailConfig
-          );
+                        const configId = siteConfig ? siteConfig.$id : '';
+              await databases.updateDocument(
+                databaseId,
+                siteConfigCollectionId,
+                configId,
+                emailConfig
+              );
           successCount += 6;
           successFields.push('email_config');
         } catch (err) {
@@ -953,10 +955,11 @@ const Admin: FC = () => {
         // Tenta salvar crypto se houver valores
         if (cryptoWallets && cryptoWallets.length > 0) {
           try {
+            const configId = siteConfig ? siteConfig.$id : '';
             await databases.updateDocument(
               databaseId,
               siteConfigCollectionId,
-              siteConfig?.$id || '',
+              configId,
               { crypto: cryptoWallets }
             );
             successCount++;
