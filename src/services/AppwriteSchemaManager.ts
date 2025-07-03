@@ -148,7 +148,7 @@ export class AppwriteSchemaManager {
         { key: 'email_from', type: 'string', required: false }
       ];
       
-      // Get existing attributes
+      // Get existing attributes - use databases directly
       const collection = await databases.getCollection(databaseId, siteConfigCollectionId);
       const existingAttributes = collection.attributes;
       
@@ -220,7 +220,7 @@ export class AppwriteSchemaManager {
         { key: 'created_at', type: 'datetime', required: false }
       ];
       
-      // Get existing attributes
+      // Get existing attributes - use databases directly
       const collection = await databases.getCollection(databaseId, userCollectionId);
       const existingAttributes = collection.attributes;
       
@@ -282,7 +282,7 @@ export class AppwriteSchemaManager {
         { key: 'user_agent', type: 'string', required: false }
       ];
       
-      // Get existing attributes
+      // Get existing attributes - use databases directly
       const collection = await databases.getCollection(databaseId, sessionCollectionId);
       const existingAttributes = collection.attributes;
       
@@ -326,4 +326,4 @@ export class AppwriteSchemaManager {
       console.error('Error ensuring session collection attributes:', error);
     }
   }
-} 
+}
