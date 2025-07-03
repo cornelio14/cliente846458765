@@ -3,6 +3,7 @@ import type { FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../services/Auth';
 import { VideoService } from '../services/VideoService';
+import { AppwriteSchemaManager } from '../services/AppwriteSchemaManager';
 import { ID } from 'appwrite';
 import { useSiteConfig } from '../context/SiteConfigContext';
 import { databases, databaseId, storage, videoCollectionId, siteConfigCollectionId, userCollectionId, videosBucketId, thumbnailsBucketId } from '../services/node_appwrite';
@@ -56,6 +57,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import GroupIcon from '@mui/icons-material/Group';
 import Snackbar from '@mui/material/Snackbar';
 import MuiAlert, { AlertProps } from '@mui/material/Alert';
+import Tooltip from '@mui/material/Tooltip';
 import React from 'react';
 
 // Tab panel component
@@ -233,6 +235,9 @@ const Admin: FC = () => {
   
   // Video element ref for getting duration
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  
+  // Schema initialization state
+  const [initializingSchema, setInitializingSchema] = useState(false);
   
   // Event listener for show-feedback events
   useEffect(() => {
@@ -967,6 +972,31 @@ const Admin: FC = () => {
     }
   }, [searchTerm, videos]);
   
+  // Initialize Appwrite schema
+  const handleInitializeSchema = async () => {
+    try {
+      setInitializingSchema(true);
+      setError(null);
+      
+      await AppwriteSchemaManager.initializeSchema();
+      
+      showFeedback('Schema initialized successfully. All required attributes have been created.', 'success');
+      
+      // Refresh data
+      await Promise.all([
+        fetchVideos(),
+        fetchUsers(),
+        fetchSiteConfig()
+      ]);
+    } catch (err) {
+      console.error('Error initializing schema:', err);
+      setError('Failed to initialize schema. Please check the console for details.');
+      showFeedback('Failed to initialize schema', 'error');
+    } finally {
+      setInitializingSchema(false);
+    }
+  };
+  
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Paper elevation={3} sx={{ mb: 4 }}>
@@ -1225,19 +1255,40 @@ const Admin: FC = () => {
                         </Typography>
                       </Grid>
                       {!editingConfig && (
-                        <Grid item>
-                          <Button
-                            variant="contained"
-                            color="primary"
-                            onClick={() => setEditingConfig(true)}
-                            startIcon={<EditIcon />}
-                            size="small"
-                          >
-                            Edit
-                          </Button>
+                        <Grid item container spacing={1} xs="auto" alignItems="center">
+                          <Grid item>
+                            <Tooltip title="Initialize the schema to create all required attributes">
+                              <Button
+                                variant="contained"
+                                color="secondary"
+                                onClick={handleInitializeSchema}
+                                disabled={initializingSchema}
+                                size="small"
+                                startIcon={initializingSchema ? <CircularProgress size={20} color="inherit" /> : null}
+                              >
+                                {initializingSchema ? 'Initializing...' : 'Initialize Schema'}
+                              </Button>
+                            </Tooltip>
+                          </Grid>
+                          <Grid item>
+                            <Button
+                              variant="contained"
+                              color="primary"
+                              onClick={() => setEditingConfig(true)}
+                              startIcon={<EditIcon />}
+                              size="small"
+                            >
+                              Edit
+                            </Button>
+                          </Grid>
                         </Grid>
                       )}
                     </Grid>
+                    
+                    <Alert severity="info" sx={{ mt: 2 }} variant="outlined">
+                      If you're experiencing issues with missing attributes in Appwrite, click the <strong>Initialize Schema</strong> button. 
+                      This will automatically create all required attributes in the database collections.
+                    </Alert>
                   </Box>
                   
                   {error && (
