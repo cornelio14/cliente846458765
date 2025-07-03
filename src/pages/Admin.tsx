@@ -518,21 +518,7 @@ const Admin: FC = () => {
           videoFile!
         );
         
-        // Formatar duração para o formato esperado pelo front-end (MM:SS ou HH:MM:SS)
-        let formattedDuration = '00:00';
-        if (videoDuration) {
-          const minutes = Math.floor(videoDuration / 60);
-          const seconds = videoDuration % 60;
-          if (minutes < 60) {
-            formattedDuration = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-          } else {
-            const hours = Math.floor(minutes / 60);
-            const remainingMinutes = minutes % 60;
-            formattedDuration = `${hours.toString().padStart(2, '0')}:${remainingMinutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-          }
-        }
-        
-        // Criar documento de vídeo com todos os campos necessários
+        // Create video document
         await databases.createDocument(
           databaseId,
           videoCollectionId,
@@ -544,11 +530,8 @@ const Admin: FC = () => {
             product_link: productLink,
             video_id: videoUpload.$id,
             thumbnail_id: thumbnailUpload.$id,
-            videoFileId: videoUpload.$id, // Adicionar campo compatível para retrocompatibilidade
-            thumbnailFileId: thumbnailUpload.$id, // Adicionar campo compatível para retrocompatibilidade
-            duration: formattedDuration, // Usar formato de string como esperado pelo frontend
+            duration: videoDuration ? parseInt(videoDuration.toString()) : 0, // Usar formato inteiro conforme esquema do Appwrite
             created_at: new Date().toISOString(),
-            createdAt: new Date().toISOString(), // Adicionar formato esperado pelo frontend
             is_active: true,
             views: 0 // Inicializar contagem de visualizações
           }
