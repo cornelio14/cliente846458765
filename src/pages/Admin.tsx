@@ -32,6 +32,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CancelIcon from '@mui/icons-material/Cancel';
 import AddIcon from '@mui/icons-material/Add';
+import SearchIcon from '@mui/icons-material/Search';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -154,6 +155,10 @@ const Admin: FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredVideos, setFilteredVideos] = useState<Video[]>([]);
+  
   // Video form state
   const [showVideoForm, setShowVideoForm] = useState(false);
   const [editingVideo, setEditingVideo] = useState<string | null>(null);
@@ -266,12 +271,29 @@ const Admin: FC = () => {
       setLoading(true);
       setError(null);
       
-      const response = await databases.listDocuments(
-        databaseId,
-        videoCollectionId
-      );
+      // Use VideoService instead of direct database call to get all videos with pagination
+      const allVideos = await VideoService.getAllVideos();
+      console.log(`Admin: Fetched ${allVideos.length} videos using VideoService`);
       
-      setVideos(response.documents as unknown as Video[]);
+      // Convert VideoService format to Admin format
+      const adminVideos = allVideos.map(video => ({
+        $id: video.$id,
+        title: video.title,
+        description: video.description,
+        price: video.price,
+        product_link: video.product_link || '',
+        video_id: video.video_id || video.videoFileId,
+        thumbnail_id: video.thumbnail_id || video.thumbnailFileId,
+        created_at: video.createdAt,
+        is_active: true,
+        duration: typeof video.duration === 'string' ? 
+          // Convert duration string (MM:SS or HH:MM:SS) to seconds
+          video.duration.split(':').reduce((acc, time) => (60 * acc) + parseInt(time), 0) : 
+          undefined
+      })) as unknown as Video[];
+      
+      setVideos(adminVideos);
+      setFilteredVideos(adminVideos);
     } catch (err) {
       console.error('Error fetching videos:', err);
       setError('Failed to load videos. Please try again.');
@@ -930,6 +952,21 @@ const Admin: FC = () => {
     }
   };
   
+  // Filter videos when search term changes
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredVideos(videos);
+    } else {
+      const term = searchTerm.toLowerCase().trim();
+      const filtered = videos.filter(
+        video => 
+          video.title.toLowerCase().includes(term) || 
+          video.description.toLowerCase().includes(term)
+      );
+      setFilteredVideos(filtered);
+    }
+  }, [searchTerm, videos]);
+  
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Paper elevation={3} sx={{ mb: 4 }}>
@@ -1105,54 +1142,71 @@ const Admin: FC = () => {
               <CircularProgress />
             </Box>
           ) : (
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Title</TableCell>
-                    <TableCell>Price</TableCell>
-                    <TableCell>Duration</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {videos.map((video) => (
-                    <TableRow key={video.$id}>
-                      <TableCell>{video.title}</TableCell>
-                      <TableCell>${video.price}</TableCell>
-                      <TableCell>{formatDuration(video.duration)}</TableCell>
-                      <TableCell>{video.is_active ? 'Active' : 'Inactive'}</TableCell>
-                      <TableCell>
-                        <IconButton 
-                          color="primary" 
-                          onClick={() => handleEditVideo(video)}
-                          aria-label="edit video"
-                          size="small"
-                          sx={{ mr: 1 }}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton 
-                          color="error" 
-                          onClick={() => openDeleteDialog('video', video.$id)}
-                          aria-label="delete video"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {videos.length === 0 && (
+            <>
+              {/* Search box */}
+              <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+                <TextField
+                  fullWidth
+                  placeholder="Pesquisar vídeos..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  variant="outlined"
+                  size="small"
+                  InputProps={{
+                    startAdornment: <SearchIcon sx={{ color: 'action.active', mr: 1 }} />,
+                  }}
+                />
+              </Box>
+              
+              <TableContainer component={Paper}>
+                <Table>
+                  <TableHead>
                     <TableRow>
-                      <TableCell colSpan={5} align="center">
-                        No videos found
-                      </TableCell>
+                      <TableCell>Title</TableCell>
+                      <TableCell>Price</TableCell>
+                      <TableCell>Duration</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Actions</TableCell>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                  </TableHead>
+                  <TableBody>
+                    {filteredVideos.map((video) => (
+                      <TableRow key={video.$id}>
+                        <TableCell>{video.title}</TableCell>
+                        <TableCell>${video.price}</TableCell>
+                        <TableCell>{formatDuration(video.duration)}</TableCell>
+                        <TableCell>{video.is_active ? 'Active' : 'Inactive'}</TableCell>
+                        <TableCell>
+                          <IconButton 
+                            color="primary" 
+                            onClick={() => handleEditVideo(video)}
+                            aria-label="edit video"
+                            size="small"
+                            sx={{ mr: 1 }}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton 
+                            color="error" 
+                            onClick={() => openDeleteDialog('video', video.$id)}
+                            aria-label="delete video"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {filteredVideos.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center">
+                          {searchTerm.trim() ? 'No videos found matching your search' : 'No videos found'}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </>
           )}
         </TabPanel>
         
