@@ -74,22 +74,27 @@ export class VideoService {
       // Array para armazenar todos os vídeos
       let allVideos: any[] = [];
       
-      // Implementar paginação para buscar todos os vídeos
+      // No Appwrite, usamos Query para paginação
       let currentPage = 1;
       let hasMorePages = true;
       const limit = 100; // Aumentar o tamanho da página para reduzir o número de chamadas
       
+      // Importar Query do Appwrite se ainda não estiver disponível
+      const { Query } = require('appwrite');
+      
       while (hasMorePages) {
         console.log(`Buscando página ${currentPage} de vídeos (limit: ${limit})`);
+        
+        // Use Query.limit() e Query.offset() para paginação
+        const queries = [
+          Query.limit(limit),
+          Query.offset((currentPage - 1) * limit)
+        ];
         
         const response = await databases.listDocuments(
           databaseId,
           videoCollectionId,
-          [
-            // Não aplicar filtros aqui para obter todos os vídeos
-          ],
-          limit,  // Limite por página
-          (currentPage - 1) * limit  // Offset para paginação
+          queries
         );
         
         // Adicionar documentos da página atual ao array de todos os vídeos
