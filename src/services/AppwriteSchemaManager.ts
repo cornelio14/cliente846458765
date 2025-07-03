@@ -84,9 +84,8 @@ export class AppwriteSchemaManager {
       ];
       
       // Get existing attributes
-      // Use type assertion since getCollection may not be properly typed in the SDK
-      const collection = await (db as any).getCollection(databaseId, videoCollectionId);
-      const existingAttributes = collection.attributes;
+      const attributesList = await (db as any).listAttributes(databaseId, videoCollectionId);
+      const existingAttributes = attributesList.attributes;
       
       // Check each required attribute
       for (const attr of requiredAttributes) {
@@ -194,8 +193,8 @@ export class AppwriteSchemaManager {
       ];
       
       // Get existing attributes
-      const collection = await (db as any).getCollection(databaseId, siteConfigCollectionId);
-      const existingAttributes = collection.attributes;
+      const attributesList = await (db as any).listAttributes(databaseId, siteConfigCollectionId);
+      const existingAttributes = attributesList.attributes;
       
       // Check each required attribute
       for (const attr of requiredAttributes) {
@@ -270,8 +269,8 @@ export class AppwriteSchemaManager {
       ];
       
       // Get existing attributes
-      const collection = await (db as any).getCollection(databaseId, userCollectionId);
-      const existingAttributes = collection.attributes;
+      const attributesList = await (db as any).listAttributes(databaseId, userCollectionId);
+      const existingAttributes = attributesList.attributes;
       
       // Check each required attribute
       for (const attr of requiredAttributes) {
@@ -335,8 +334,8 @@ export class AppwriteSchemaManager {
       ];
       
       // Get existing attributes
-      const collection = await (db as any).getCollection(databaseId, sessionCollectionId);
-      const existingAttributes = collection.attributes;
+      const attributesList = await (db as any).listAttributes(databaseId, sessionCollectionId);
+      const existingAttributes = attributesList.attributes;
       
       // Check each required attribute
       for (const attr of requiredAttributes) {
