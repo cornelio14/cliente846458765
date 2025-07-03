@@ -79,9 +79,6 @@ export class VideoService {
       let hasMorePages = true;
       const limit = 100; // Aumentar o tamanho da página para reduzir o número de chamadas
       
-      // Importar Query do Appwrite se ainda não estiver disponível
-      const { Query } = require('appwrite');
-      
       while (hasMorePages) {
         console.log(`Buscando página ${currentPage} de vídeos (limit: ${limit})`);
         
