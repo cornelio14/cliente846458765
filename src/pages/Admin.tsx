@@ -510,26 +510,59 @@ const Admin: FC = () => {
           videoId = videoUpload.$id;
         }
         
-        // Update video document
-        await databases.updateDocument(
-          databaseId,
-          videoCollectionId,
-          editingVideo,
-          {
-            title: videoTitle,
-            description: videoDescription,
-            price: parseFloat(videoPrice),
-            product_link: productLink,
-            ...(videoId ? { video_id: videoId } : {}),
-            ...(thumbnailId ? { thumbnail_id: thumbnailId } : {}),
-            ...(videoDuration ? { duration: videoDuration } : {})
+        try {
+          // Primeiro tente com apenas os campos obrigatórios
+          await databases.updateDocument(
+            databaseId,
+            videoCollectionId,
+            editingVideo,
+            {
+              title: videoTitle,
+              description: videoDescription,
+              price: parseFloat(videoPrice),
+              product_link: productLink
+            }
+          );
+          
+          // Se deu certo, tente atualizar os campos adicionais
+          try {
+            if (videoId || thumbnailId || videoDuration) {
+              await databases.updateDocument(
+                databaseId,
+                videoCollectionId,
+                editingVideo,
+                {
+                  ...(videoId ? { video_id: videoId } : {}),
+                  ...(thumbnailId ? { thumbnail_id: thumbnailId } : {}),
+                  ...(videoDuration ? { duration: videoDuration } : {})
+                }
+              );
+            }
+          } catch (err: any) {
+            console.error('Erro ao atualizar campos adicionais do vídeo:', err);
+            showFeedback('Alguns campos adicionais do vídeo não puderam ser atualizados porque os atributos não existem.', 'error');
           }
-        );
-        
-        // Show success message
-        setSnackbarMessage('Video successfully updated!');
-        setSnackbarSeverity('success');
-        setSnackbarOpen(true);
+          
+          // Show success message
+          setSnackbarMessage('Video successfully updated!');
+          setSnackbarSeverity('success');
+          setSnackbarOpen(true);
+        } catch (err: any) {
+          // Se houve erro nos campos obrigatórios
+          console.error('Error updating video:', err);
+          
+          if (err.message && err.message.includes('Attribute')) {
+            setError(`Erro ao salvar vídeo: Atributo não encontrado. Execute "Initialize Schema" primeiro e crie o atributo manualmente: ${err.message}`);
+          } else {
+            setError(`Erro ao salvar vídeo: ${err.message}`);
+          }
+          
+          // Show error message
+          setSnackbarMessage('Failed to update video. Please check if all required attributes exist.');
+          setSnackbarSeverity('error');
+          setSnackbarOpen(true);
+          return;
+        }
       } else {
         // Upload thumbnail
         const thumbnailUpload = await storage.createFile(
@@ -545,29 +578,68 @@ const Admin: FC = () => {
           videoFile!
         );
         
-        // Create video document
-        await databases.createDocument(
-          databaseId,
-          videoCollectionId,
-          ID.unique(),
-          {
-            title: videoTitle,
-            description: videoDescription,
-            price: parseFloat(videoPrice),
-            product_link: productLink,
-            video_id: videoUpload.$id,
-            thumbnail_id: thumbnailUpload.$id,
-            duration: videoDuration ? parseInt(videoDuration.toString()) : 0, // Usar formato inteiro conforme esquema do Appwrite
-            created_at: new Date().toISOString(),
-            is_active: true,
-            views: 0 // Inicializar contagem de visualizações
+        try {
+          // Criar documento de vídeo básico primeiro
+          const videoDoc = await databases.createDocument(
+            databaseId,
+            videoCollectionId,
+            ID.unique(),
+            {
+              title: videoTitle,
+              description: videoDescription,
+              price: parseFloat(videoPrice),
+              product_link: productLink
+            }
+          );
+          
+          // Adicionar campos adicionais se os atributos existirem
+          try {
+            await databases.updateDocument(
+              databaseId,
+              videoCollectionId,
+              videoDoc.$id,
+              {
+                video_id: videoUpload.$id,
+                thumbnail_id: thumbnailUpload.$id,
+                duration: videoDuration ? parseInt(videoDuration.toString()) : 0,
+                created_at: new Date().toISOString(),
+                is_active: true,
+                views: 0
+              }
+            );
+          } catch (err: any) {
+            console.error('Erro ao adicionar campos adicionais ao vídeo:', err);
+            showFeedback('O vídeo foi criado, mas alguns campos adicionais não puderam ser salvos porque os atributos não existem.', 'error');
           }
-        );
-        
-        // Show success message
-        setSnackbarMessage('Video successfully uploaded!');
-        setSnackbarSeverity('success');
-        setSnackbarOpen(true);
+          
+          // Show success message
+          setSnackbarMessage('Video successfully uploaded!');
+          setSnackbarSeverity('success');
+          setSnackbarOpen(true);
+        } catch (err: any) {
+          // Se houve erro nos campos obrigatórios
+          console.error('Error creating video:', err);
+          
+          // Limpar os arquivos enviados em caso de erro
+          try {
+            await storage.deleteFile(thumbnailsBucketId, thumbnailUpload.$id);
+            await storage.deleteFile(videosBucketId, videoUpload.$id);
+          } catch (deleteErr) {
+            console.error('Error cleaning up uploaded files after error:', deleteErr);
+          }
+          
+          if (err.message && err.message.includes('Attribute')) {
+            setError(`Erro ao criar vídeo: Atributo não encontrado. Execute "Initialize Schema" primeiro e crie o atributo manualmente: ${err.message}`);
+          } else {
+            setError(`Erro ao criar vídeo: ${err.message}`);
+          }
+          
+          // Show error message
+          setSnackbarMessage('Failed to create video. Please check if all required attributes exist.');
+          setSnackbarSeverity('error');
+          setSnackbarOpen(true);
+          return;
+        }
       }
       
       // Reset form
@@ -579,12 +651,17 @@ const Admin: FC = () => {
       // Refresh videos list
       fetchVideos();
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error uploading video:', err);
-      setError('Failed to save video. Please try again.');
+      
+      if (err.message && err.message.includes('Attribute')) {
+        setError(`Erro ao salvar vídeo: Atributo não encontrado. Execute "Initialize Schema" primeiro e crie o atributo manualmente: ${err.message}`);
+      } else {
+        setError(`Erro ao salvar vídeo: ${err.message}`);
+      }
       
       // Show error message
-      setSnackbarMessage('Failed to save video. Please try again.');
+      setSnackbarMessage('Failed to save video. Please check if all required attributes exist.');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
     } finally {
@@ -767,16 +844,60 @@ const Admin: FC = () => {
       setLoading(true);
       setError(null);
       
-      if (!siteConfig) {
-        // Create new config
-        const newConfig = {
-          site_name: siteName,
-          paypal_client_id: paypalClientId,
-          stripe_publishable_key: stripePublishableKey,
-          stripe_secret_key: stripeSecretKey,
-          telegram_username: telegramUsername,
-          video_list_title: videoListTitle || 'Available Videos',
-          crypto: cryptoWallets,
+      // Construa o objeto com os dados necessários
+      const configData = {
+        site_name: siteName,
+        paypal_client_id: paypalClientId,
+        stripe_publishable_key: stripePublishableKey,
+        stripe_secret_key: stripeSecretKey,
+        telegram_username: telegramUsername,
+        video_list_title: videoListTitle || 'Available Videos',
+      };
+      
+      // Adicione campos opcionais com validação
+      try {
+        // Tente primeiro salvar apenas os campos obrigatórios
+        if (!siteConfig) {
+          // Create new config
+          await databases.createDocument(
+            databaseId,
+            siteConfigCollectionId,
+            ID.unique(),
+            configData
+          );
+          
+          // Se chegou aqui, foi salvo com sucesso, então atualize a variável siteConfig
+          await fetchSiteConfig();
+        } else {
+          // Update existing config
+          await databases.updateDocument(
+            databaseId,
+            siteConfigCollectionId,
+            siteConfig.$id,
+            configData
+          );
+        }
+        
+        // Agora tente adicionar os campos opcionais um por um
+        // Se ocorrer um erro, significa que o atributo não existe
+        
+        // Adicionar crypto
+        if (cryptoWallets.length > 0) {
+          try {
+            await databases.updateDocument(
+              databaseId,
+              siteConfigCollectionId,
+              siteConfig?.$id || '',
+              { crypto: cryptoWallets }
+            );
+          } catch (error) {
+            console.error("Erro ao salvar carteiras crypto:", error);
+            showFeedback('As carteiras crypto não foram salvas. Atributo "crypto" não existe na coleção.', 'error');
+          }
+        }
+        
+        // Configurações de email
+        const emailConfig = {
           email_host: emailHost,
           email_port: emailPort,
           email_secure: emailSecure,
@@ -785,44 +906,41 @@ const Admin: FC = () => {
           email_from: emailFrom,
         };
         
-        await databases.createDocument(
-          databaseId,
-          siteConfigCollectionId,
-          ID.unique(),
-          newConfig
-        );
-      } else {
-        // Update existing config
-        const updatedConfig = {
-          site_name: siteName,
-          paypal_client_id: paypalClientId,
-          stripe_publishable_key: stripePublishableKey,
-          stripe_secret_key: stripeSecretKey,
-          telegram_username: telegramUsername,
-          video_list_title: videoListTitle || 'Available Videos',
-          crypto: cryptoWallets,
-          email_host: emailHost,
-          email_port: emailPort,
-          email_secure: emailSecure,
-          email_user: emailUser,
-          email_pass: emailPass,
-          email_from: emailFrom,
-        };
+        try {
+          await databases.updateDocument(
+            databaseId,
+            siteConfigCollectionId,
+            siteConfig?.$id || '',
+            emailConfig
+          );
+        } catch (error) {
+          console.error("Erro ao salvar configurações de email:", error);
+          showFeedback('Configurações de email não foram salvas. Alguns atributos não existem na coleção.', 'error');
+        }
         
-        await databases.updateDocument(
-          databaseId,
-          siteConfigCollectionId,
-          siteConfig.$id,
-          updatedConfig
-        );
+      } catch (err: any) {
+        // Se ocorreu um erro ao salvar os campos obrigatórios, mostre uma mensagem específica
+        console.error('Erro ao salvar configurações básicas:', err);
+        
+        // Verifica se o erro é sobre um atributo não encontrado
+        if (err.message && err.message.includes('Attribute')) {
+          setError(`Erro ao salvar: Atributo não encontrado. Execute "Initialize Schema" primeiro e crie o atributo manualmente: ${err.message}`);
+          showFeedback('Erro ao salvar: Atributo não encontrado', 'error');
+        } else {
+          setError(`Erro ao salvar configurações: ${err.message}`);
+          showFeedback('Falha ao salvar configurações do site', 'error');
+        }
+        
+        return;
       }
       
-      showFeedback('Site configuration saved successfully', 'success');
+      showFeedback('Configurações do site salvas com sucesso', 'success');
       refreshConfig(); // Update the context with new config
       setEditingConfig(false);
-    } catch (err) {
-      console.error('Error saving site config:', err);
-      showFeedback('Failed to save site configuration', 'error');
+    } catch (err: any) {
+      console.error('Erro ao salvar configurações do site:', err);
+      setError(`Erro ao salvar: ${err.message}`);
+      showFeedback('Falha ao salvar configurações do site', 'error');
     } finally {
       setLoading(false);
     }
@@ -981,7 +1099,15 @@ const Admin: FC = () => {
       await AppwriteSchemaManager.initializeSchema();
       
       showFeedback('Schema documentation generated. Please check the console for required attributes.', 'success');
-      setError('Note: Due to SDK compatibility issues, attributes must be created manually in the Appwrite Console. See browser console for details.');
+      
+      // Mostrar instruções mais detalhadas
+      setError('Importante: Devido a limitações do SDK Web, os atributos devem ser criados manualmente no Console do Appwrite.\n\n' +
+        'Instruções:\n' +
+        '1. Acesse o Console do Appwrite\n' +
+        '2. Vá para Database > Collections\n' +
+        '3. Para cada coleção (videos, users, site_config, sessions), adicione os atributos listados no console do navegador\n' +
+        '4. Depois de criar os atributos, você poderá salvar os dados normalmente\n\n' +
+        'Se você estiver vendo erros sobre atributos não encontrados ao salvar, significa que alguns atributos necessários ainda não foram criados.');
       
       // Refresh data
       await Promise.all([
