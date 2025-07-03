@@ -511,31 +511,36 @@ const Admin: FC = () => {
         }
         
         try {
-          // Primeiro tente com apenas os campos obrigatórios
+          // Primeiro tente com todos os campos obrigatórios
+          // Para edição, vamos preservar valores existentes quando não fornecidos
+          const requiredFields = {
+            title: videoTitle,
+            description: videoDescription,
+            price: parseFloat(videoPrice),
+            product_link: productLink,
+            video_id: videoId || existingVideo.video_id,
+            thumbnail_id: thumbnailId || existingVideo.thumbnail_id
+          };
+          
           await databases.updateDocument(
             databaseId,
             videoCollectionId,
             editingVideo,
-            {
-              title: videoTitle,
-              description: videoDescription,
-              price: parseFloat(videoPrice),
-              product_link: productLink
-            }
+            requiredFields
           );
           
           // Se deu certo, tente atualizar os campos adicionais
           try {
-            if (videoId || thumbnailId || videoDuration) {
+            const optionalFields = {
+              ...(videoDuration ? { duration: videoDuration } : {})
+            };
+            
+            if (Object.keys(optionalFields).length > 0) {
               await databases.updateDocument(
                 databaseId,
                 videoCollectionId,
                 editingVideo,
-                {
-                  ...(videoId ? { video_id: videoId } : {}),
-                  ...(thumbnailId ? { thumbnail_id: thumbnailId } : {}),
-                  ...(videoDuration ? { duration: videoDuration } : {})
-                }
+                optionalFields
               );
             }
           } catch (err: any) {
@@ -579,7 +584,8 @@ const Admin: FC = () => {
         );
         
         try {
-          // Criar documento de vídeo básico primeiro
+          // Criar documento de vídeo com TODOS os campos obrigatórios
+          // Aqui vemos na captura de tela que title, description, price, product_link, video_id e thumbnail_id são required
           const videoDoc = await databases.createDocument(
             databaseId,
             videoCollectionId,
@@ -588,22 +594,22 @@ const Admin: FC = () => {
               title: videoTitle,
               description: videoDescription,
               price: parseFloat(videoPrice),
-              product_link: productLink
+              product_link: productLink,
+              video_id: videoUpload.$id,        // Campo obrigatório
+              thumbnail_id: thumbnailUpload.$id, // Campo obrigatório
+              created_at: new Date().toISOString(), // Campo obrigatório
+              is_active: true                    // Campo obrigatório
             }
           );
           
-          // Adicionar campos adicionais se os atributos existirem
+          // Adicionar campos opcionais se os atributos existirem
           try {
             await databases.updateDocument(
               databaseId,
               videoCollectionId,
               videoDoc.$id,
               {
-                video_id: videoUpload.$id,
-                thumbnail_id: thumbnailUpload.$id,
                 duration: videoDuration ? parseInt(videoDuration.toString()) : 0,
-                created_at: new Date().toISOString(),
-                is_active: true,
                 views: 0
               }
             );
